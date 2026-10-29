@@ -1,453 +1,818 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Calidad organoléptica en recepción de camarón</title>
-<script src="https://cdn.tailwindcss.com/3.4.17"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<style>
-  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f6f7f9;color:#1f2a37;font-size:15px}
-  .card{background:#fff;border:1px solid #e5e7eb;border-radius:10px}
-  .tab{padding:.8rem 1.2rem;color:#6b7280;border-bottom:3px solid transparent;white-space:nowrap;font-weight:500}
-  .tab.on{color:#1f2a37;border-color:#1f2a37;font-weight:700}
-  .chip{border:1px solid #cbd5e1;border-radius:999px;padding:.35rem .9rem;font-size:.875rem;background:#fff}
-  .chip.on{background:#1f2a37;color:#fff;border-color:#1f2a37}
-  .pg{border:1px solid #cbd5e1;border-radius:6px;padding:.3rem .8rem;background:#fff}
-  .pg:disabled{opacity:.4;cursor:default}
-  .fl label{display:block;font-size:.8rem;color:#6b7280;margin-bottom:.2rem}
-  .fl select,.fl input{width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:.4rem .5rem;background:#fff;font-size:.9rem}
-  th{font-weight:600;padding:.6rem .7rem;white-space:nowrap} td{padding:.55rem .7rem}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Directivo de Calidad - Recepción y Empaque</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f1f5f9; }
+    .tab-active { border-bottom: 3px solid #2563eb; color: #1d4ed8; font-weight: 700; background-color: #eff6ff; }
+    .badge-a { background-color: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+    .badge-b { background-color: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+    .badge-c { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+  </style>
 </head>
-<body>
+<body class="text-slate-800">
 
-<header class="bg-white border-b border-slate-200">
-  <div class="max-w-7xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
-    <div>
-      <h1 class="text-xl md:text-2xl font-bold">Calidad organoléptica en recepción de camarón</h1>
-      <p id="status" class="text-sm text-slate-500 mt-0.5">Cargando datos…</p>
+  <!-- HEADER -->
+  <header class="bg-slate-900 text-white shadow-lg border-b border-slate-700">
+    <div class="max-w-[1440px] mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="bg-blue-600 text-xs font-bold uppercase px-2.5 py-1 rounded">Control de Calidad y Producción</span>
+          <span class="text-slate-400 text-xs" id="statusCarga">Buscando datos_recepcion.csv en GitHub...</span>
+        </div>
+        <h1 class="text-xl md:text-2xl font-bold mt-1">Visión Directiva: Rendimiento, Logística y Clasificación</h1>
+      </div>
+      
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="flex items-center gap-2 bg-slate-800 px-3 py-2 rounded-lg border border-slate-700 text-xs cursor-pointer hover:bg-slate-750" title="Agrupa filas repetidas del mismo Lote y Piscina para no duplicar libras y rescata campos vacíos de logística">
+          <input type="checkbox" id="chkDeduplicar" checked class="rounded text-blue-600" onchange="applyFilters()">
+          <span>Deduplicar Lotes (Consolidar filas)</span>
+        </label>
+        <label class="bg-blue-600 hover:bg-blue-500 transition text-white text-xs font-semibold px-4 py-2.5 rounded-lg cursor-pointer flex items-center gap-2 shadow">
+          <span>🔄 Carga Manual (CSV)</span>
+          <input type="file" accept=".csv" class="hidden" onchange="handleManualUpload(event)">
+        </label>
+      </div>
     </div>
-    <div class="flex flex-wrap items-center gap-2 text-sm">
-      <label class="flex items-center gap-2 border border-slate-300 rounded-md px-3 py-2 cursor-pointer bg-white">
-        <input type="checkbox" id="dedup" checked> Omitir lotes duplicados <span id="dupInfo" class="text-slate-500"></span>
-      </label>
-      <label for="file" class="bg-slate-800 text-white rounded-md px-3 py-2 cursor-pointer font-medium">Cargar archivo</label>
-      <input type="file" id="file" accept=".csv,.txt,.xlsx,.xls" class="hidden">
+  </header>
+
+  <!-- FILTROS GLOBALES -->
+  <section class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-20">
+    <div class="max-w-[1440px] mx-auto px-4 py-3 grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Camaronera</label>
+        <select id="fCamaronera" onchange="applyFilters()" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white"><option value="ALL">Todas</option></select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Logística de Pesca</label>
+        <select id="fLogistica" onchange="applyFilters()" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white"><option value="ALL">Todas</option></select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Clase a Empacar</label>
+        <select id="fClase" onchange="applyFilters()" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white"><option value="ALL">Todas</option></select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Fecha Llegada</label>
+        <select id="fFecha" onchange="applyFilters()" class="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm bg-white"><option value="ALL">Todas</option></select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-slate-500 mb-1">Buscar Lote / Piscina</label>
+        <input type="text" id="fBusqueda" oninput="debounceFilter()" placeholder="Ej: 1447843 o PU3010A" class="w-full border border-slate-300 rounded-md px-2.5 py-1.5 text-sm">
+      </div>
+      <div>
+        <button onclick="resetFilters()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-1.5 px-3 rounded-md text-sm transition">Limpiar Filtros</button>
+      </div>
     </div>
-  </div>
-</header>
+  </section>
 
-<section class="bg-white border-b border-slate-200 md:sticky md:top-0 z-20">
-  <div class="fl max-w-7xl mx-auto px-4 py-3 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 items-end">
-    <div><label>Camaronera</label><select id="fCam"><option value="ALL">Todas</option></select></div>
-    <div><label>Lote (escribe para buscar)</label><input id="fLote" list="dlLotes" placeholder="Todos"><datalist id="dlLotes"></datalist></div>
-    <div><label>Zona anatómica</label>
-      <select id="fZona"><option value="ALL">Todas las zonas</option><option value="H">Cabeza</option><option value="T">Cola</option><option value="B">Todo el cuerpo</option></select></div>
-    <div><label>Muestra</label>
-      <select id="fMuestra"><option value="ALL">Consolidado</option><option value="1">1° muestra</option><option value="2">2° muestra</option><option value="3">3° muestra</option></select></div>
-    <div><label>Fecha desde</label><input type="date" id="fDesde"></div>
-    <div><label>Fecha hasta</label><input type="date" id="fHasta"></div>
-    <div><label>Lotes en gráficos</label>
-      <select id="fTop"><option>15</option><option selected>30</option><option>60</option><option>100</option></select></div>
-    <div><button id="btnReset" class="w-full bg-slate-100 hover:bg-slate-200 rounded-md py-2 font-medium text-sm">Limpiar filtros</button></div>
-  </div>
-</section>
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="max-w-[1440px] mx-auto px-4 py-5" id="mainContent" style="display: none;">
+    
+    <!-- KPIs -->
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <p class="text-[10px] text-slate-500 font-bold uppercase">Lotes Analizados</p>
+        <p id="kpiLotes" class="text-2xl font-extrabold mt-1">0</p>
+        <p id="kpiFilasInfo" class="text-[10px] text-slate-400 mt-1">de 0 filas totales</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-600">
+        <p class="text-[10px] text-blue-700 font-bold uppercase">Libras Totales Recibidas</p>
+        <p id="kpiLibras" class="text-2xl font-extrabold text-slate-800 mt-1">0</p>
+        <p class="text-[10px] text-slate-500 mt-1">Volumen consolidado (lb)</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-emerald-500">
+        <p class="text-[10px] text-emerald-700 font-bold uppercase">% E. Fresco y Sano</p>
+        <p id="kpiSanoPct" class="text-2xl font-extrabold text-emerald-600 mt-1">0%</p>
+        <p id="kpiSanoUnid" class="text-[10px] text-slate-500 mt-1">Prom. 0 unid/lote</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-indigo-500">
+        <p class="text-[10px] text-indigo-700 font-bold uppercase">Gramaje Promedio</p>
+        <p id="kpiGramajeEntero" class="text-2xl font-extrabold text-indigo-600 mt-1">0 g</p>
+        <p id="kpiGramajeCola" class="text-[10px] text-slate-500 mt-1">Cola: 0 g</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-600 bg-green-50/40">
+        <p class="text-[10px] text-green-800 font-bold uppercase">Volumen Clase A</p>
+        <p id="kpiClaseA" class="text-2xl font-extrabold text-green-700 mt-1">0%</p>
+        <p id="kpiClaseALbs" class="text-[10px] text-green-600 mt-1">0 lbs en A-PRIMERA</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-amber-500">
+        <p class="text-[10px] text-amber-700 font-bold uppercase">Logística Propia</p>
+        <p id="kpiLogisticaOmarsa" class="text-2xl font-extrabold text-slate-800 mt-1">0%</p>
+        <p id="kpiLogisticaDetalle" class="text-[10px] text-slate-500 mt-1">Participación en lbs</p>
+      </div>
+    </div>
 
-<main class="max-w-7xl mx-auto px-4 py-5">
-  <div id="vacio" class="card p-8 text-center text-slate-600">
-    <p class="font-semibold text-lg">Aún no hay datos</p>
-    <p class="mt-1">Sube el archivo <b>Consolidado_Organoleptico.csv</b> con el botón “Cargar archivo”, o colócalo junto a esta página en GitHub.</p>
-  </div>
+    <!-- TABS NAVEGACIÓN -->
+    <div class="bg-white rounded-t-xl border border-b-0 border-slate-200 flex overflow-x-auto">
+      <button onclick="switchTab('tab1')" id="btn-tab1" class="px-5 py-3 text-sm font-medium tab-active whitespace-nowrap">📊 1. Resumen y Volumen</button>
+      <button onclick="switchTab('tab2')" id="btn-tab2" class="px-5 py-3 text-sm font-medium text-slate-600 hover:text-slate-900 whitespace-nowrap">🚚 2. Desempeño Logístico</button>
+      <button onclick="switchTab('tab3')" id="btn-tab3" class="px-5 py-3 text-sm font-medium text-amber-700 bg-amber-50/60 hover:text-amber-900 whitespace-nowrap font-bold border-x">🏆 3. Scorecard Camaroneras y Piscinas</button>
+      <button onclick="switchTab('tab4')" id="btn-tab4" class="px-5 py-3 text-sm font-medium text-emerald-700 bg-emerald-50/60 hover:text-emerald-900 whitespace-nowrap font-bold border-r">📈 4. Gramajes y Correlaciones</button>
+      <button onclick="switchTab('tab5')" id="btn-tab5" class="px-5 py-3 text-sm font-medium text-slate-600 hover:text-slate-900 whitespace-nowrap">📋 5. Explorador de Datos (+13k)</button>
+    </div>
 
-  <div id="app" class="hidden">
-    <div id="kpis" class="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-5"></div>
+    <!-- TAB 1: RESUMEN GERENCIAL -->
+    <div id="tab1" class="bg-white p-5 rounded-b-xl shadow-sm border border-slate-200 space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <h3 class="text-sm font-bold mb-1">Distribución de Libras por Clase a Empacar</h3>
+          <p class="text-[10px] text-slate-500 mb-2">Proporción del volumen recibido según su clasificación comercial.</p>
+          <div class="h-72"><canvas id="chartClasesPie"></canvas></div>
+        </div>
+        <div class="lg:col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <h3 class="text-sm font-bold mb-1">Tendencia Diaria: Libras Recibidas vs % Fresco y Sano</h3>
+          <p class="text-[10px] text-slate-500 mb-2">Evolución del volumen de recepción (barras) y calidad física promedio (línea).</p>
+          <div class="h-72"><canvas id="chartTendenciaDia"></canvas></div>
+        </div>
+      </div>
+      <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <h3 class="text-sm font-bold mb-1">Volumen y Clasificación por Camaronera (Top 15 por Libras)</h3>
+        <p class="text-[10px] text-slate-500 mb-2">Desglose de libras aportadas por camaronera según la Clase a empacar (A-PRIMERA, B-SEGUNDA, C-TERCERO).</p>
+        <div class="h-80"><canvas id="chartCamaroneraStack"></canvas></div>
+      </div>
+    </div>
 
-    <nav class="card rounded-b-none border-b-0 flex overflow-x-auto" id="tabs">
-      <button class="tab on" data-t="p1">Resumen ejecutivo</button>
-      <button class="tab" data-t="p2">Pareto anatómico</button>
-      <button class="tab" data-t="p3">Muestras y cadena de frío</button>
-      <button class="tab" data-t="p4">Explorador y auditoría</button>
-    </nav>
-
-    <!-- Pestaña 1 -->
-    <section id="p1" class="card rounded-t-none p-5 space-y-6">
-      <p id="note1" class="text-sm text-slate-500"></p>
-      <div class="grid lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2"><h3 class="font-bold mb-2">Composición de calidad por lote (100%)</h3><div class="h-80"><canvas id="cStack"></canvas></div></div>
-        <div><h3 class="font-bold mb-2">Defectos por zona anatómica</h3><div class="h-80"><canvas id="cDona"></canvas></div></div>
+    <!-- TAB 2: DESEMPEÑO LOGÍSTICO -->
+    <div id="tab2" class="bg-white p-5 rounded-b-xl shadow-sm border border-slate-200 space-y-6 hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <h3 class="text-sm font-bold mb-1">Impacto del Tipo de Logística en la Calidad (% Fresco y Sano)</h3>
+          <p class="text-[10px] text-slate-500 mb-2">Comparativa del porcentaje promedio de camarón sano según logística de pesca.</p>
+          <div class="h-72"><canvas id="chartLogisticaCalidad"></canvas></div>
+        </div>
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <h3 class="text-sm font-bold mb-1">Proporción de Clases Empacadas por Tipo de Logística (%)</h3>
+          <p class="text-[10px] text-slate-500 mb-2">¿Qué tipo de logística conserva mejor la calidad A-PRIMERA?</p>
+          <div class="h-72"><canvas id="chartLogisticaClases"></canvas></div>
+        </div>
       </div>
       <div>
-        <h3 class="font-bold mb-2">Diagnóstico operativo por lote</h3>
-        <div class="overflow-x-auto border border-slate-200 rounded-lg">
-          <table class="w-full text-sm text-left"><thead class="bg-slate-50 text-slate-600"><tr>
-            <th>Lote</th><th>Camaronera</th><th>Fecha</th><th class="text-right">T (°C)</th><th class="text-right">Unidades</th>
-            <th class="text-right">% sano</th><th class="text-right">% cabeza</th><th class="text-right">% cola</th><th class="text-right">% cuerpo</th><th>Diagnóstico</th>
-          </tr></thead><tbody id="tbDiag"></tbody></table>
-        </div>
-        <div id="pgDiag" class="flex items-center justify-end gap-3 mt-2 text-sm"></div>
-      </div>
-    </section>
-
-    <!-- Pestaña 2 -->
-    <section id="p2" class="card rounded-t-none p-5 space-y-5 hidden">
-      <div id="chips" class="flex flex-wrap gap-2"></div>
-      <div class="grid lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-2"><h3 class="font-bold mb-2">Diagrama de Pareto de defectos</h3><div class="h-96"><canvas id="cPareto"></canvas></div></div>
-        <div class="overflow-y-auto max-h-96 border border-slate-200 rounded-lg">
-          <table class="w-full text-sm"><thead class="bg-slate-50 text-slate-600 sticky top-0"><tr>
-            <th>Defecto</th><th class="text-right">Unid.</th><th class="text-right">Aporte</th><th class="text-right">Acum.</th></tr></thead>
-            <tbody id="tbPareto"></tbody></table>
+        <h3 class="text-sm font-bold text-slate-800 mb-2">Resumen Comparativo por Tipo de Logística de Pesca</h3>
+        <div class="overflow-x-auto border rounded-lg border-slate-200">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead class="bg-slate-100 text-slate-600 uppercase">
+              <tr>
+                <th class="p-2.5">Tipo de Logística</th>
+                <th class="p-2.5 text-right">Lotes</th>
+                <th class="p-2.5 text-right">Libras Totales</th>
+                <th class="p-2.5 text-right">% E. Fresco y Sano (Prom)</th>
+                <th class="p-2.5 text-right">% Lbs en A-PRIMERA</th>
+                <th class="p-2.5 text-right">% Lbs en B-SEGUNDA</th>
+                <th class="p-2.5 text-right">% Lbs en C-TERCERO</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyLogistica" class="divide-y divide-slate-200"></tbody>
+          </table>
         </div>
       </div>
-      <p class="text-sm text-slate-500">Los defectos marcados en rojo concentran el primer 80% de las no conformidades.</p>
-    </section>
+    </div>
 
-    <!-- Pestaña 3 -->
-    <section id="p3" class="card rounded-t-none p-5 space-y-6 hidden">
-      <div>
-        <h3 class="font-bold mb-1">Homogeneidad entre muestras: % fresco y sano</h3>
-        <p id="note3" class="text-sm text-slate-500 mb-2"></p>
-        <div class="h-80"><canvas id="cMuestras"></canvas></div>
-      </div>
-      <div>
-        <h3 class="font-bold mb-1">Temperatura de recepción vs % camarón flácido</h3>
-        <p id="corr" class="text-sm text-slate-500 mb-2"></p>
-        <div class="h-80"><canvas id="cTemp"></canvas></div>
-      </div>
-    </section>
-
-    <!-- Pestaña 4 -->
-    <section id="p4" class="card rounded-t-none p-5 space-y-4 hidden">
-      <div class="flex flex-wrap items-center gap-2 justify-between">
-        <div class="flex flex-wrap gap-2 items-center">
-          <input id="exQ" placeholder="Buscar en la tabla…" class="border border-slate-300 rounded-md px-3 py-2 text-sm w-64">
-          <label for="file" class="border border-slate-300 rounded-md px-3 py-2 text-sm cursor-pointer bg-white">Cargar nuevo archivo</label>
+    <!-- TAB 3: SCORECARD PROVEEDORES Y PISCINAS -->
+    <div id="tab3" class="bg-white p-5 rounded-b-xl shadow-sm border border-amber-200 space-y-6 hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-green-50 p-4 rounded-xl border border-green-200">
+          <h3 class="text-sm font-bold text-green-900 mb-1">🏆 Top 10: Mejores Camaroneras / Piscinas</h3>
+          <p class="text-[10px] text-green-700 mb-3">Mayor porcentaje promedio de E. Fresco y Sano.</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-green-100 text-green-800 uppercase border-b border-green-300">
+                <tr>
+                  <th class="p-2">Camaronera</th>
+                  <th class="p-2">Piscina</th>
+                  <th class="p-2 text-right">Lotes</th>
+                  <th class="p-2 text-right">Libras</th>
+                  <th class="p-2 text-right">% Sano</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyMejores" class="divide-y divide-green-200 text-green-900"></tbody>
+            </table>
+          </div>
         </div>
-        <div class="flex gap-2 text-sm">
-          <button id="btnCsv" class="bg-slate-800 text-white rounded-md px-3 py-2 font-medium">Exportar CSV</button>
-          <button id="btnXls" class="bg-slate-800 text-white rounded-md px-3 py-2 font-medium">Exportar Excel</button>
+        <div class="bg-red-50 p-4 rounded-xl border border-red-200">
+          <h3 class="text-sm font-bold text-red-900 mb-1">🚨 Alerta: Piscinas Críticas (Top 10 Menor Calidad)</h3>
+          <p class="text-[10px] text-red-700 mb-3">Piscinas con menor porcentaje de E. Fresco y Sano.</p>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-red-100 text-red-800 uppercase border-b border-red-300">
+                <tr>
+                  <th class="p-2">Camaronera</th>
+                  <th class="p-2">Piscina</th>
+                  <th class="p-2 text-right">Lotes</th>
+                  <th class="p-2 text-right">Libras</th>
+                  <th class="p-2 text-right">% Sano</th>
+                </tr>
+              </thead>
+              <tbody id="tbodyPeores" class="divide-y divide-red-200 text-red-900"></tbody>
+            </table>
+          </div>
         </div>
       </div>
-      <p id="exCount" class="text-sm text-slate-500"></p>
-      <div class="overflow-x-auto border border-slate-200 rounded-lg max-h-[28rem]">
-        <table class="w-full text-sm text-left"><thead class="bg-slate-50 text-slate-600 sticky top-0"><tr>
-          <th>Lote</th><th>Camaronera</th><th>Fecha</th><th>Muestra</th><th>Parámetro</th><th>Zona</th><th class="text-right">Unidades</th><th class="text-right">% real</th>
-        </tr></thead><tbody id="tbEx"></tbody></table>
+    </div>
+
+    <!-- TAB 4: GRAMAJES Y CORRELACIONES -->
+    <div id="tab4" class="bg-white p-5 rounded-b-xl shadow-sm border border-emerald-200 space-y-6 hidden">
+      <div class="flex items-center justify-between bg-emerald-50 px-4 py-2 rounded-lg border border-emerald-200">
+        <span class="text-xs text-emerald-800 font-medium">💡 Para mantener la fluidez con +13,000 filas, los gráficos de dispersión muestran hasta 1,500 lotes representativos del filtro actual.</span>
+        <span id="scatterSampleInfo" class="text-xs font-bold text-emerald-900"></span>
       </div>
-      <div id="pgEx" class="flex items-center justify-end gap-3 text-sm"></div>
-    </section>
-  </div>
-</main>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-800 mb-1">Relación: Meta Gramaje Entero vs Meta Gramaje Cola</h3>
+          <p class="text-[10px] text-slate-500 mb-2">Consistencia de conversión biométrica entre camarón entero y cola.</p>
+          <div class="h-80"><canvas id="chartCorrGramaje"></canvas></div>
+        </div>
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-800 mb-1">Impacto: % E. Fresco y Sano vs Gramaje Entero (Por Clase)</h3>
+          <p class="text-[10px] text-slate-500 mb-2">Distribución de lotes coloreados según su Clase a Empacar (Verde=A, Amarillo=B, Rojo=C).</p>
+          <div class="h-80"><canvas id="chartCorrCalidadGramaje"></canvas></div>
+        </div>
+      </div>
+    </div>
 
-<script>
-/* ============ 1. CONFIGURACIÓN ============ */
-const CSV_URL = './Consolidado_Organoleptico.csv';   // CSV junto a este index.html
-const CFG = { TEMP_MAX: 4.0, SANO_OK: 80, SANO_MIN: 60, CAB_DESC: 20, COLA_MAX: 15, HOMOG: 10 };
-// Zonas: S = sano, H = cabeza, T = cola, B = todo el cuerpo
-const ZN = { S: 'Fresco y sano', H: 'Cabeza', T: 'Cola', B: 'Todo el cuerpo' };
-const ZC = { S: '#7FA6A0', H: '#3F5F7F', T: '#9AA5B1', B: '#C8B88A' };   // paleta apagada
-const ACC = '#C62828', INK = '#1f2a37', OK = '#4C8C6B', WARN = '#C58B1B';  // acento para riesgos
-const PARAMS = [
-  ['Camarón Fresco y Sano','S'],
-  ['Camarón Cabeza Floja','H'],['Hepato Páncreas reventado','H'],['Cabeza Anaranjada','H'],['Camarón lodo en branquias','H'],
-  ['Camarón Quebrado','T'],['Camarón Deforme','T'],['Camarón con corbata grande','T'],['Camarón con corbata sucia','T'],
-  ['Camarón Flácido','B'],['Camarón Mudado','B'],['Camarón manchas leves','B'],['Camarón manchas fuertes','B'],
-  ['Camarón con Hongos/Bacterias','B'],['Camarón Deshidratado','B'],['Camarón Deshidratado fuerte','B'],
-  ['Camarón con Melanosis','B'],['Camarón Rosado/rojo','B'],['Camarón semirosado','B'],['Otros','B']
-];
-const IFLA = PARAMS.findIndex(p => p[0] === 'Camarón Flácido');
+    <!-- TAB 5: EXPLORADOR DE DATOS Y EXPORTACIÓN -->
+    <div id="tab5" class="bg-white p-5 rounded-b-xl shadow-sm border border-slate-200 hidden space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-2">
+          <button onclick="exportCSV()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 py-2 rounded-lg font-bold shadow transition">
+            ⬇️ Exportar Vista Filtrada a CSV
+          </button>
+          <span id="tableCountInfo" class="text-xs text-slate-500 font-medium ml-2"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="changePage(-1)" class="px-3 py-1 bg-slate-200 hover:bg-slate-300 rounded text-xs font-bold">◀ Anterior</button>
+          <span id="pageIndicator" class="text-xs font-semibold px-2">Página 1</span>
+          <button onclick="changePage(1)" class="px-3 py-1 bg-slate-200 hover:bg-slate-300 rounded text-xs font-bold">Siguiente ▶</button>
+        </div>
+      </div>
 
-/* ============ 2. UTILIDADES ============ */
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const norm = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-  .replace(/[°º]/g, '').replace(/[–—]/g, '-').replace(/\s*-\s*/g, ' - ').replace(/\s+/g, ' ').trim();
-const PN = PARAMS.map(p => norm(p[0]));
-const f1 = v => v.toFixed(1);
-const dot = z => `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${z.startsWith('#') ? z : ZC[z]};margin-right:6px"></span>`;
+      <div class="overflow-x-auto border rounded-lg border-slate-200">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead class="bg-slate-800 text-white uppercase">
+            <tr>
+              <th class="p-2.5">Lote</th>
+              <th class="p-2.5">Nombre de camaronera</th>
+              <th class="p-2.5">Piscina</th>
+              <th class="p-2.5">Tipo de logística</th>
+              <th class="p-2.5">Fecha de llegada</th>
+              <th class="p-2.5 text-right">Gramaje Entero</th>
+              <th class="p-2.5 text-right">Gramaje Cola</th>
+              <th class="p-2.5 text-right">E. Fresco y Sano</th>
+              <th class="p-2.5 text-right">Libras Recibidas</th>
+              <th class="p-2.5 text-center">Clase a Empacar</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyRawData" class="divide-y divide-slate-200"></tbody>
+        </table>
+      </div>
+    </div>
 
-// Número tolerante: acepta vacíos, "12,5", "1.234,5", "15%" y negativos (los pasa a 0)
-function num(v) {
-  if (typeof v === 'number') return isFinite(v) && v > 0 ? v : 0;
-  let s = String(v ?? '').replace('%', '').trim();
-  if (!s) return 0;
-  if (s.includes(',')) s = s.includes('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(',', '.');
-  const n = parseFloat(s);
-  return isFinite(n) && n > 0 ? n : 0;
-}
-function parseTemp(v) {
-  if (typeof v === 'number') return isFinite(v) ? v : null;
-  const n = parseFloat(String(v ?? '').replace(',', '.'));
-  return isFinite(n) ? n : null;   // vacío = sin dato (no es 0 °C)
-}
-// Fecha a formato ISO (acepta dd/mm/aaaa, aaaa-mm-dd y número serial de Excel)
-function isoDate(v) {
-  if (typeof v === 'string' && /^\d{5}(\.\d+)?$/.test(v.trim())) v = Number(v);
-  if (typeof v === 'number') return v > 20000 && v < 80000 ? new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10) : '';
-  const s = String(v ?? '').trim(); let m;
-  if ((m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/))) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
-  if ((m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})/))) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-  return s;
-}
-function setStatus(msg, bad) { const e = $('status'); e.textContent = msg; e.style.color = bad ? ACC : OK; }
+  </main>
 
-/* ============ 3. CARGA DE DATOS ============ */
-let LOTS = [];
-function ingest(rows, origen) {
-  if (!rows.length) return setStatus('El archivo no tiene filas de datos.', true);
-  const km = {}; Object.keys(rows[0]).forEach(k => km[norm(k)] = k);
-  const find = (n, exacto) => km[n] || (exacto ? null : km[Object.keys(km).find(x => x.startsWith(n))] || null);
-  const C = { arch: find('archivo'), lote: find('lote', 1), tipo: find('tipo'), fecha: find('fecha'), camaronera: find('camaronera'), piscina: find('piscina'), temp: find('temperatura') };
-  const U = PN.map(p => [1, 2, 3].map(m => km[`${p} - ${m} muestra - unid`] || null));  // U[parámetro][muestra]
-  if (!U.flat().some(Boolean)) return setStatus('No se encontraron columnas con el formato "Parámetro - 1° Muestra - Unid".', true);
-  const g = (r, k) => k ? String(r[k] ?? '').trim() : '';
-  LOTS = [];
-  rows.forEach((r, i) => {
-    const u = [0, 1, 2].map(m => U.map(ks => ks[m] ? num(r[ks[m]]) : 0));   // u[muestra][parámetro]
-    const st = u.map(a => a.reduce((x, y) => x + y, 0));                      // unidades reales por muestra
-    if (!st[0] && !st[1] && !st[2]) return;                                   // fila sin evaluaciones
-    LOTS.push({ id: i, arch: g(r, C.arch), lote: g(r, C.lote) || 'Sin lote', tipo: g(r, C.tipo), fecha: isoDate(C.fecha ? r[C.fecha] : ''),
-      camaronera: g(r, C.camaronera) || 'Sin dato', piscina: g(r, C.piscina), temp: C.temp ? parseTemp(r[C.temp]) : null, u, st });
-  });
-  if (!LOTS.length) return setStatus('No hay lotes con unidades evaluadas.', true);
-  ['fCam', 'fLote', 'fDesde', 'fHasta'].forEach(id => $(id).value = id === 'fCam' ? 'ALL' : '');
-  $('vacio').classList.add('hidden'); $('app').classList.remove('hidden');
-  setStatus(`${origen}: ${LOTS.length.toLocaleString('es-EC')} lotes cargados`);
-  populate(); update();
-}
-async function decode(buf) {
-  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); }
-  catch (e) { return new TextDecoder('windows-1252').decode(buf); }   // CSV de Excel en español
-}
-function parseCSV(text, origen) {
-  const r = Papa.parse(text, { header: true, skipEmptyLines: 'greedy', transformHeader: h => h.trim() });
-  ingest(r.data, origen);
-}
-async function autoLoad() {
-  try {
-    const res = await fetch(CSV_URL + '?v=' + Date.now(), { cache: 'no-store' });
-    if (!res.ok) throw new Error();
-    parseCSV(await decode(await res.arrayBuffer()), 'Base automática');
-  } catch (e) { setStatus('No se encontró el CSV junto a la página. Usa "Cargar archivo".', true); }
-}
-async function onFile(e) {
-  const f = e.target.files[0]; if (!f) return;
-  try {
-    const buf = await f.arrayBuffer();
-    if (/\.(csv|txt)$/i.test(f.name)) parseCSV(await decode(buf), f.name);
-    else { const wb = XLSX.read(new Uint8Array(buf), { type: 'array' }); ingest(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' }), f.name); }
-  } catch (err) { setStatus('No se pudo leer el archivo: ' + err.message, true); }
-  e.target.value = '';
-}
+  <script>
+    // Nombre del archivo CSV en tu repositorio de GitHub
+    const CSV_FILENAME = 'datos_recepcion.csv';
 
-/* ============ 4. FILTROS Y CÁLCULO ============ */
-function activeLots() {
-  if (!$('dedup').checked) return LOTS;
-  const seen = new Set();
-  return LOTS.filter(l => { const k = [l.lote, l.piscina, l.fecha].join('|').toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
-}
-function populate() {
-  const L = activeLots(), cur = $('fCam').value;
-  const cams = [...new Set(L.map(l => l.camaronera))].sort();
-  $('fCam').innerHTML = '<option value="ALL">Todas</option>' + cams.map(c => `<option>${esc(c)}</option>`).join('');
-  if (cams.includes(cur)) $('fCam').value = cur;
-  $('dlLotes').innerHTML = [...new Set(L.map(l => l.lote))].map(v => `<option value="${esc(v)}">`).join('');
-  $('dupInfo').textContent = LOTS.length - L.length ? `(${LOTS.length - L.length} omitidos)` : '';
-}
-const ISO = /^\d{4}-\d{2}-\d{2}$/;
-function filtered() {
-  const cam = $('fCam').value, q = $('fLote').value.trim().toLowerCase(), d1 = $('fDesde').value, d2 = $('fHasta').value;
-  return activeLots().filter(l => (cam === 'ALL' || l.camaronera === cam) && (!q || l.lote.toLowerCase().includes(q))
-    && (!d1 || (ISO.test(l.fecha) && l.fecha >= d1)) && (!d2 || (ISO.test(l.fecha) && l.fecha <= d2)));
-}
-// Recalcula todo desde las unidades reales (ignora las columnas de % del archivo)
-function compute(lots, ms) {
-  const ix = ms === 'ALL' ? [0, 1, 2] : [+ms - 1];
-  return lots.map(l => {
-    const c = new Array(PARAMS.length).fill(0), z = { S: 0, H: 0, T: 0, B: 0 };
-    ix.forEach(m => l.u[m].forEach((v, i) => c[i] += v));
-    c.forEach((v, i) => z[PARAMS[i][1]] += v);
-    const tot = z.S + z.H + z.T + z.B, p = k => tot ? z[k] / tot * 100 : 0;
-    const r = { l, c, z, tot, pS: p('S'), pH: p('H'), pT: p('T'), pB: p('B'), fl: tot ? c[IFLA] / tot * 100 : 0,
-      ms3: [0, 1, 2].map(m => l.st[m] ? l.u[m][0] / l.st[m] * 100 : null) };
-    r.dx = diagnose(r); return r;
-  });
-}
-function diagnose(r) {
-  const t = r.l.temp;
-  if (t != null && t > CFG.TEMP_MAX) return { txt: 'Alerta de cadena de frío', c: ACC };
-  if (r.pH >= CFG.CAB_DESC && r.pT < CFG.COLA_MAX) return { txt: 'Derivar a descabezado (cola)', c: WARN };
-  if (r.pS < CFG.SANO_MIN) return { txt: 'Revisar lote, calidad baja', c: ACC };
-  if (r.pS >= CFG.SANO_OK) return { txt: 'Apto para entero', c: OK };
-  return { txt: 'Apto con observación', c: WARN };
-}
+    const CLASE_COLORS = {
+      'A-PRIMERA': '#16a34a',
+      'B-SEGUNDA': '#eab308',
+      'C-TERCERO': '#dc2626',
+      'OTROS': '#64748b'
+    };
 
-/* ============ 5. RENDER ============ */
-Object.assign(Chart.defaults.font, { size: 13, family: 'system-ui, sans-serif' });
-Chart.defaults.color = '#4b5563'; Chart.defaults.maintainAspectRatio = false;
-Chart.defaults.plugins.legend.position = 'bottom'; Chart.defaults.plugins.legend.labels.usePointStyle = true;
-const CH = {};
-const draw = (id, cfg) => { if (CH[id]) CH[id].destroy(); CH[id] = new Chart($(id), cfg); };
-const ax = (o = {}) => ({ grid: { display: false }, border: { display: false }, ...o });   // sin bordes ni rejilla vertical
-const ay = (o = {}) => ({ grid: { color: '#e9ecef' }, border: { display: false }, ...o });
-const info = r => `${r.l.camaronera}${r.l.piscina ? ', piscina ' + r.l.piscina : ''}, ${r.l.fecha || 'sin fecha'}`;
-let R = [], EX = [], EXV = [];
-const pgD = { p: 0 }, pgE = { p: 0 };
+    let rawRows = [];
+    let filteredLots = [];
+    let charts = {};
+    let currentPage = 1;
+    const ROWS_PER_PAGE = 100;
+    let debounceTimer = null;
 
-function update() {
-  if (!LOTS.length) return;
-  const lots = filtered(), ms = $('fMuestra').value, zf = $('fZona').value;
-  R = compute(lots, ms).filter(r => r.tot > 0);
-  kpis(); tab1(); tab2(zf); tab3(compute(lots, 'ALL').filter(r => r.tot > 0));
-  document.querySelectorAll('#chips .chip').forEach(b => b.classList.toggle('on', b.dataset.z === zf));
-  pgD.p = 0; pgE.p = 0; buildEx(zf, ms); renderDiag(); renderEx();
-}
-function kpis() {
-  const S = k => R.reduce((a, r) => a + r.z[k], 0), tot = S('S') + S('H') + S('T') + S('B');
-  const pc = v => tot ? f1(v / tot * 100) + '%' : '—', temps = R.map(r => r.l.temp).filter(t => t != null);
-  const hot = temps.filter(t => t > CFG.TEMP_MAX).length;
-  const set = (k, v, n) => { $('v' + k).textContent = v; $('n' + k).innerHTML = n; };
-  set('u', tot.toLocaleString('es-EC'), `en ${R.length.toLocaleString('es-EC')} lote(s)`);
-  set('s', pc(S('S')), `${S('S').toLocaleString('es-EC')} unid. conformes`);
-  set('h', pc(S('H')), 'cefalotórax'); set('t', pc(S('T')), 'abdomen'); set('b', pc(S('B')), 'sistémico');
-  set('x', temps.length ? f1(temps.reduce((a, b) => a + b, 0) / temps.length) + ' °C' : '—',
-    temps.length ? `Máx. ${f1(Math.max(...temps))} °C` + (hot ? `, <b style="color:${ACC}">${hot} lote(s) sobre ${f1(CFG.TEMP_MAX)} °C</b>` : '') : 'sin datos');
-  $('cx').style.borderLeftColor = hot ? ACC : '#cbd5e1';
-  $('vx').style.color = hot ? ACC : INK;
-}
-function tab1() {
-  const top = R.slice().sort((a, b) => a.pS - b.pS).slice(0, +$('fTop').value);
-  $('note1').textContent = `Mostrando ${top.length} de ${R.length} lotes, de menor a mayor % sano. Los lotes en rojo superan ${f1(CFG.TEMP_MAX)} °C.`;
-  draw('cStack', { type: 'bar',
-    data: { labels: top.map(r => r.l.lote), datasets: ['S', 'B', 'H', 'T'].map(k => ({ label: ZN[k], backgroundColor: ZC[k], data: top.map(r => r['p' + k]) })) },
-    options: { scales: { x: ax({ stacked: true, ticks: { autoSkip: true, maxRotation: 60, color: c => top[c.index] && top[c.index].l.temp > CFG.TEMP_MAX ? ACC : '#4b5563' } }), y: ay({ stacked: true, max: 100, ticks: { callback: v => v + '%' } }) },
-      plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${f1(c.parsed.y)}%`, afterTitle: i => info(top[i[0].dataIndex]) } } } } });
-  const ks = ['H', 'T', 'B'], vals = ks.map(k => R.reduce((a, r) => a + r.z[k], 0)), sum = vals.reduce((a, b) => a + b, 0);
-  draw('cDona', { type: 'doughnut', data: { labels: ks.map(k => ZN[k]), datasets: [{ data: vals, backgroundColor: ks.map(k => ZC[k]), borderWidth: 2 }] },
-    options: { cutout: '62%', plugins: { tooltip: { callbacks: { label: c => `${c.label}: ${c.parsed.toLocaleString('es-EC')} unid. (${sum ? f1(c.parsed / sum * 100) : 0}%)` } } } } });
-}
-function pager(id, st, total, size, cb) {
-  const n = Math.max(1, Math.ceil(total / size)); st.p = Math.min(st.p, n - 1);
-  $(id).innerHTML = `<button class="pg" data-d="-1" ${st.p ? '' : 'disabled'}>Anterior</button><span>Página ${st.p + 1} de ${n}</span><button class="pg" data-d="1" ${st.p < n - 1 ? '' : 'disabled'}>Siguiente</button>`;
-  $(id).onclick = e => { const d = e.target.dataset.d; if (d) { st.p += +d; cb(); } };
-}
-function renderDiag() {
-  const rows = R.slice().sort((a, b) => a.pS - b.pS), size = 15;
-  pager('pgDiag', pgD, rows.length, size, renderDiag);
-  $('tbDiag').innerHTML = rows.slice(pgD.p * size, (pgD.p + 1) * size).map(r => {
-    const l = r.l, hot = l.temp != null && l.temp > CFG.TEMP_MAX;
-    return `<tr class="border-t border-slate-200" ${hot ? 'style="background:#fdf2f2"' : ''}><td class="font-semibold">${esc(l.lote)}</td>
-      <td>${esc(l.camaronera)}${l.piscina ? ' (' + esc(l.piscina) + ')' : ''}</td><td>${esc(l.fecha)}</td>
-      <td class="text-right" style="${hot ? 'color:' + ACC + ';font-weight:700' : ''}">${l.temp == null ? '—' : f1(l.temp)}</td>
-      <td class="text-right">${r.tot.toLocaleString('es-EC')}</td><td class="text-right font-semibold">${f1(r.pS)}%</td>
-      <td class="text-right">${f1(r.pH)}%</td><td class="text-right">${f1(r.pT)}%</td><td class="text-right">${f1(r.pB)}%</td>
-      <td style="color:${r.dx.c};font-weight:600">${dot(r.dx.c)}${r.dx.txt}</td></tr>`;
-  }).join('') || '<tr><td colspan="10" class="text-center text-slate-500 py-6">Sin lotes para los filtros seleccionados</td></tr>';
-}
-function tab2(zf) {
-  const d = PARAMS.map((p, i) => ({ n: p[0].replace('Camarón ', ''), z: p[1], u: R.reduce((a, r) => a + r.c[i], 0) }))
-    .filter(x => x.z !== 'S' && x.u > 0 && (zf === 'ALL' || x.z === zf)).sort((a, b) => b.u - a.u);
-  const tot = d.reduce((a, b) => a + b.u, 0); let cum = 0;
-  d.forEach(x => { x.pre = tot ? cum / tot * 100 : 0; cum += x.u; x.cum = tot ? cum / tot * 100 : 0; x.pct = tot ? x.u / tot * 100 : 0; });
-  draw('cPareto', { data: { labels: d.map(x => x.n), datasets: [
-    { type: 'bar', label: 'Unidades', data: d.map(x => x.u), backgroundColor: d.map(x => ZC[x.z]), order: 2 },
-    { type: 'line', label: '% acumulado', data: d.map(x => +f1(x.cum)), yAxisID: 'y1', borderColor: INK, backgroundColor: INK, pointRadius: 3, order: 1 },
-    { type: 'line', label: 'Límite 80%', data: d.map(() => 80), yAxisID: 'y1', borderColor: ACC, borderDash: [6, 4], pointRadius: 0, order: 0 }] },
-    options: { scales: { x: ax({ ticks: { maxRotation: 55 } }), y: ay({ title: { display: true, text: 'Unidades' } }),
-      y1: { position: 'right', min: 0, max: 100, grid: { display: false }, border: { display: false }, ticks: { callback: v => v + '%' } } } } });
-  $('tbPareto').innerHTML = d.map(x => `<tr class="border-t border-slate-200" ${x.pre < 80 ? `style="color:${ACC};font-weight:600"` : ''}>
-    <td>${dot(x.z)}${esc(x.n)}</td><td class="text-right">${x.u.toLocaleString('es-EC')}</td><td class="text-right">${f1(x.pct)}%</td><td class="text-right">${f1(x.cum)}%</td></tr>`).join('')
-    || '<tr><td colspan="4" class="text-center text-slate-500 py-6">Sin defectos registrados</td></tr>';
-}
-function pearson(p) {
-  const n = p.length; if (n < 3) return null;
-  const mx = p.reduce((a, b) => a + b.x, 0) / n, my = p.reduce((a, b) => a + b.y, 0) / n; let sxy = 0, sxx = 0, syy = 0;
-  p.forEach(q => { sxy += (q.x - mx) * (q.y - my); sxx += (q.x - mx) ** 2; syy += (q.y - my) ** 2; });
-  return sxx && syy ? sxy / Math.sqrt(sxx * syy) : null;
-}
-const limitLine = { id: 'limite', afterDraw(c) {
-  const x = c.scales.x; if (!x || CFG.TEMP_MAX < x.min || CFG.TEMP_MAX > x.max) return;
-  const px = x.getPixelForValue(CFG.TEMP_MAX), a = c.chartArea, g = c.ctx;
-  g.save(); g.strokeStyle = ACC; g.fillStyle = ACC; g.lineWidth = 1.5; g.setLineDash([6, 4]); g.beginPath(); g.moveTo(px, a.top); g.lineTo(px, a.bottom); g.stroke();
-  g.setLineDash([]); g.font = '13px system-ui'; g.fillText('Límite ' + f1(CFG.TEMP_MAX) + ' °C', px + 6, a.top + 14); g.restore(); } };
-function tab3(R3) {
-  R3.forEach(r => { const v = r.ms3.filter(x => x != null); r.rng = v.length > 1 ? Math.max(...v) - Math.min(...v) : 0; });
-  const top = R3.slice().sort((a, b) => b.rng - a.rng).slice(0, +$('fTop').value);
-  const avg = m => { const v = R3.map(r => r.ms3[m]).filter(x => x != null); return v.length ? f1(v.reduce((a, b) => a + b, 0) / v.length) + '%' : '—'; };
-  $('note3').textContent = `Promedio de % sano: 1° ${avg(0)}, 2° ${avg(1)}, 3° ${avg(2)}. ${R3.filter(r => r.rng > CFG.HOMOG).length} lote(s) con más de ${CFG.HOMOG} puntos de diferencia entre muestras. Se muestran ${top.length} de ${R3.length} lotes, primero los más desiguales.`;
-  const sh = ['#A9BCCF', '#5F7F9F', '#2B4560'];
-  draw('cMuestras', { type: 'bar', data: { labels: top.map(r => r.l.lote), datasets: [0, 1, 2].map(m => ({ label: `${m + 1}° muestra`, backgroundColor: sh[m], data: top.map(r => r.ms3[m] == null ? null : +f1(r.ms3[m])) })) },
-    options: { scales: { x: ax({ ticks: { maxRotation: 60 } }), y: ay({ max: 100, ticks: { callback: v => v + '%' } }) },
-      plugins: { tooltip: { callbacks: { afterTitle: i => info(top[i[0].dataIndex]) } } } } });
-  const pts = R.filter(r => r.l.temp != null).map(r => ({ x: r.l.temp, y: +f1(r.fl), r }));
-  const rr = pearson(pts);
-  $('corr').textContent = rr == null ? 'Datos insuficientes para calcular la correlación.' : `Correlación de Pearson r = ${rr.toFixed(2)} con ${pts.length.toLocaleString('es-EC')} lotes. Los puntos rojos superan ${f1(CFG.TEMP_MAX)} °C.`;
-  draw('cTemp', { type: 'scatter', plugins: [limitLine],
-    data: { datasets: [{ label: 'Lotes', data: pts, pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: pts.map(p => p.x > CFG.TEMP_MAX ? ACC : '#5F7F9F') }] },
-    options: { scales: { x: ax({ suggestedMin: CFG.TEMP_MAX - 2, title: { display: true, text: 'Temperatura (°C)' } }), y: ay({ beginAtZero: true, title: { display: true, text: '% camarón flácido' } }) },
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `Lote ${c.raw.r.l.lote}: ${f1(c.raw.x)} °C, ${f1(c.raw.y)}% flácido` } } } } });
-}
+    window.onload = async () => {
+      try {
+        const response = await fetch(CSV_FILENAME, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const text = await response.text();
+        parseCSVText(text);
+      } catch (err) {
+        console.warn("No se encontró el archivo automático en la ruta. Esperando carga manual.", err);
+        const st = document.getElementById('statusCarga');
+        st.textContent = "⚠️ Sube tu archivo con el botón 'Carga Manual (CSV)' o nombra tu archivo 'datos_recepcion.csv' en GitHub.";
+        st.classList.replace('text-slate-400', 'text-amber-400');
+      }
+    };
 
-/* ============ 6. EXPLORADOR Y EXPORTACIÓN ============ */
-function buildEx(zf, ms) {
-  const ix = ms === 'ALL' ? [0, 1, 2] : [+ms - 1]; EX = [];
-  R.forEach(r => { const l = r.l;
-    ix.forEach(m => { if (!l.st[m]) return;
-      l.u[m].forEach((v, i) => {
-        const z = PARAMS[i][1]; if (v <= 0 || (zf !== 'ALL' && z !== zf)) return;
-        const o = { 'Lote': l.lote, 'Camaronera': l.camaronera, 'Piscina': l.piscina, 'Fecha': l.fecha, 'Temperatura': l.temp ?? '',
-          'Muestra': m + 1, 'Parámetro': PARAMS[i][0], 'Zona': ZN[z], 'Unidades': v, 'Porcentaje real': +(v / l.st[m] * 100).toFixed(2) };
-        o.s = Object.values(o).join(' ').toLowerCase(); EX.push(o);
-      }); }); });
-}
-function renderEx() {
-  const q = $('exQ').value.trim().toLowerCase(), size = 50;
-  EXV = q ? EX.filter(o => o.s.includes(q)) : EX;
-  pager('pgEx', pgE, EXV.length, size, renderEx);
-  $('exCount').textContent = `${EXV.length.toLocaleString('es-EC')} filas (una por parámetro evaluado). La exportación incluye los filtros y la búsqueda actuales.`;
-  $('tbEx').innerHTML = EXV.slice(pgE.p * size, (pgE.p + 1) * size).map(o => `<tr class="border-t border-slate-200"><td class="font-semibold">${esc(o.Lote)}</td>
-    <td>${esc(o.Camaronera)}</td><td>${esc(o.Fecha)}</td><td>${o.Muestra}° muestra</td><td>${esc(o['Parámetro'])}</td><td>${esc(o.Zona)}</td>
-    <td class="text-right font-semibold">${o.Unidades}</td><td class="text-right">${o['Porcentaje real']}%</td></tr>`).join('')
-    || '<tr><td colspan="8" class="text-center text-slate-500 py-6">Sin filas para mostrar</td></tr>';
-}
-const clean = () => EXV.map(({ s, ...o }) => o);
-function exportCSV() {
-  const d = clean(); if (!d.length) return;
-  const q = v => /[",\n;]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v, cols = Object.keys(d[0]);
-  const csv = [cols.join(','), ...d.map(o => cols.map(c => q(o[c])).join(','))].join('\n');
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }));
-  a.download = 'datos-normalizados.csv'; a.click(); URL.revokeObjectURL(a.href);
-}
-function exportXLS() {
-  const d = clean(); if (!d.length) return;
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(d), 'Datos normalizados');
-  XLSX.writeFile(wb, 'datos-normalizados.xlsx');
-}
+    function handleManualUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      document.getElementById('statusCarga').textContent = "⏳ Procesando archivo...";
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: res => initData(res.data)
+      });
+    }
 
-/* ============ 7. EVENTOS ============ */
-function showTab(id) {
-  ['p1', 'p2', 'p3', 'p4'].forEach(t => $(t).classList.toggle('hidden', t !== id));
-  document.querySelectorAll('#tabs .tab').forEach(b => b.classList.toggle('on', b.dataset.t === id));
-  Object.values(CH).forEach(c => c.resize());
-}
-window.addEventListener('DOMContentLoaded', () => {
-  $('kpis').innerHTML = [['u', 'Unidades evaluadas', INK], ['s', 'Fresco y sano', ZC.S], ['h', 'Defectos de cabeza', ZC.H], ['t', 'Defectos de cola', ZC.T],
-    ['b', 'Defectos de todo el cuerpo', ZC.B], ['x', 'Temperatura promedio', '#cbd5e1']].map(k =>
-    `<div class="card p-4" id="c${k[0]}" style="border-left:4px solid ${k[2]}"><p class="text-sm text-slate-500">${k[1]}</p>
-     <p id="v${k[0]}" class="text-2xl font-bold mt-1">0</p><p id="n${k[0]}" class="text-sm text-slate-500 mt-0.5">&nbsp;</p></div>`).join('');
-  $('chips').innerHTML = [['ALL', 'Ver todos'], ['H', 'Solo cabeza'], ['T', 'Solo cola'], ['B', 'Solo cuerpo']].map(z => `<button class="chip" data-z="${z[0]}">${z[1]}</button>`).join('');
-  $('chips').onclick = e => { if (e.target.dataset.z) { $('fZona').value = e.target.dataset.z; update(); } };
-  $('tabs').onclick = e => { if (e.target.dataset.t) showTab(e.target.dataset.t); };
-  ['fCam', 'fLote', 'fZona', 'fMuestra', 'fDesde', 'fHasta', 'fTop'].forEach(id => $(id).addEventListener('input', update));
-  $('dedup').addEventListener('change', () => { populate(); update(); });
-  $('exQ').addEventListener('input', () => { pgE.p = 0; renderEx(); });
-  $('btnReset').onclick = () => { ['fCam', 'fZona', 'fMuestra'].forEach(id => $(id).value = 'ALL'); ['fLote', 'fDesde', 'fHasta'].forEach(id => $(id).value = ''); update(); };
-  $('btnCsv').onclick = exportCSV; $('btnXls').onclick = exportXLS; $('file').addEventListener('change', onFile);
-  autoLoad();
-});
-</script>
+    function parseCSVText(text) {
+      document.getElementById('statusCarga').textContent = "⏳ Procesando +13k registros...";
+      Papa.parse(text, {
+        header: true,
+        skipEmptyLines: true,
+        complete: res => initData(res.data)
+      });
+    }
+
+    function toNumber(val) {
+      if (val === null || val === undefined || val === '') return 0;
+      if (typeof val === 'number') return val;
+      // Limpia espacios y convierte coma decimal a punto
+      const clean = String(val).trim().replace(/\s+/g, '').replace(',', '.');
+      const parsed = parseFloat(clean);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+
+    // Extrae "68 (64.76 %)" -> { unid: 68, pct: 64.76, raw: "68 (64.76 %)" }
+    function parseFrescoSano(str) {
+      if (!str) return { unid: 0, pct: 0, raw: '0 (0%)' };
+      const s = String(str).trim();
+      const match = s.match(/(\d+(?:[.,]\d+)?)\s*\(\s*(\d+(?:[.,]\d+)?)\s*%?\s*\)/);
+      if (match) {
+        return {
+          unid: parseFloat(match[1].replace(',', '.')),
+          pct: parseFloat(match[2].replace(',', '.')),
+          raw: s
+        };
+      }
+      const single = toNumber(s);
+      return { unid: single, pct: single, raw: s };
+    }
+
+    // Extrae solo el día "01/08/2026" de "01/08/2026 00:44"
+    function extractDateOnly(dateTimeStr) {
+      if (!dateTimeStr) return 'Sin Fecha';
+      return String(dateTimeStr).trim().split(' ')[0];
+    }
+
+    function parseDateObj(dateStr) {
+      const parts = dateStr.split('/');
+      if (parts.length === 3) return new Date(parts[2], parts[1] - 1, parts[0]);
+      return new Date(dateStr);
+    }
+
+    // Busca una columna ignorando mayúsculas/minúsculas o tildes leves
+    function getCol(row, possibleNames) {
+      for (const name of possibleNames) {
+        if (row[name] !== undefined) return row[name];
+      }
+      const keys = Object.keys(row);
+      for (const name of possibleNames) {
+        const found = keys.find(k => k.trim().toLowerCase() === name.toLowerCase());
+        if (found) return row[found];
+      }
+      return '';
+    }
+
+    function initData(rows) {
+      rawRows = rows.map(r => {
+        const lote = String(getCol(r, ['Lote']) || '').trim();
+        const camaronera = String(getCol(r, ['Nombre de camaronera', 'Camaronera']) || '').trim();
+        const piscina = String(getCol(r, ['Piscina']) || '').trim();
+        const logistica = String(getCol(r, ['Tipo de logística de pesca', 'Tipo de logistica de pesca', 'Logística']) || '').trim();
+        const fechaFull = String(getCol(r, ['Fecha de llegada', 'Fecha']) || '').trim();
+        const fechaDia = extractDateOnly(fechaFull);
+        const gramajeEntero = toNumber(getCol(r, ['Meta_Gramaje entero', 'Gramaje entero']));
+        const gramajeCola = toNumber(getCol(r, ['Meta_Gramaje cola', 'Gramaje cola']));
+        const frescoObj = parseFrescoSano(getCol(r, ['E. fresco y sano', 'Fresco y sano']));
+        const libras = toNumber(getCol(r, ['Libras recibidas total', 'Libras recibidas']));
+        const clase = String(getCol(r, ['Clase a empacar', 'Clase']) || 'SIN CLASE').trim().toUpperCase();
+
+        return {
+          Lote: lote,
+          Camaronera: camaronera || 'Sin Especificar',
+          Piscina: piscina || 'S/P',
+          Logistica: logistica, // Se deja vacío si no viene para consolidar en deduplicación
+          FechaFull: fechaFull,
+          FechaDia: fechaDia,
+          GramajeEntero: gramajeEntero,
+          GramajeCola: gramajeCola,
+          SanoUnid: frescoObj.unid,
+          SanoPct: frescoObj.pct,
+          SanoRaw: frescoObj.raw,
+          Libras: libras,
+          Clase: clase
+        };
+      }).filter(r => r.Lote !== '');
+
+      const st = document.getElementById('statusCarga');
+      st.textContent = `✅ ${rawRows.length.toLocaleString()} filas cargadas con éxito`;
+      st.className = "text-emerald-400 text-xs font-bold";
+      document.getElementById('mainContent').style.display = "block";
+
+      populateSelects();
+      applyFilters();
+    }
+
+    // Deduplica por Lote + Piscina, pero si una fila tiene vacía la Logística y otra sí la tiene, conserva el valor no vacío
+    function getProcessedDataset() {
+      if (!document.getElementById('chkDeduplicar').checked) {
+        return rawRows.map(r => ({ ...r, Logistica: r.Logistica || 'Sin especificar' }));
+      }
+      const map = new Map();
+      for (const item of rawRows) {
+        const key = `${item.Lote}_${item.Piscina}_${item.Camaronera}`;
+        if (!map.has(key)) {
+          map.set(key, { ...item });
+        } else {
+          const existing = map.get(key);
+          if (!existing.Logistica && item.Logistica) existing.Logistica = item.Logistica;
+          if (!existing.Libras && item.Libras) existing.Libras = item.Libras;
+          if (!existing.SanoPct && item.SanoPct) {
+            existing.SanoPct = item.SanoPct;
+            existing.SanoUnid = item.SanoUnid;
+            existing.SanoRaw = item.SanoRaw;
+          }
+        }
+      }
+      return Array.from(map.values()).map(r => ({
+        ...r,
+        Logistica: r.Logistica || 'Sin especificar'
+      }));
+    }
+
+    function populateSelects() {
+      const base = getProcessedDataset();
+      updateSel('fCamaronera', new Set(base.map(l => l.Camaronera)), 'Todas');
+      updateSel('fLogistica', new Set(base.map(l => l.Logistica)), 'Todas');
+      updateSel('fClase', new Set(base.map(l => l.Clase)), 'Todas');
+      const fechasOrdenadas = Array.from(new Set(base.map(l => l.FechaDia))).sort((a, b) => parseDateObj(a) - parseDateObj(b));
+      updateSel('fFecha', fechasOrdenadas, 'Todas');
+    }
+
+    function updateSel(id, iterable, defaultText) {
+      const el = document.getElementById(id);
+      const prev = el.value;
+      const arr = Array.from(iterable).filter(Boolean);
+      el.innerHTML = `<option value="ALL">${defaultText}</option>` + arr.map(v => `<option value="${v}">${v}</option>`).join('');
+      if (arr.includes(prev)) el.value = prev;
+    }
+
+    function debounceFilter() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => applyFilters(), 220);
+    }
+
+    function applyFilters() {
+      const base = getProcessedDataset();
+      const fCam = document.getElementById('fCamaronera').value;
+      const fLog = document.getElementById('fLogistica').value;
+      const fCla = document.getElementById('fClase').value;
+      const fFec = document.getElementById('fFecha').value;
+      const q = document.getElementById('fBusqueda').value.trim().toLowerCase();
+
+      filteredLots = base.filter(l =>
+        (fCam === 'ALL' || l.Camaronera === fCam) &&
+        (fLog === 'ALL' || l.Logistica === fLog) &&
+        (fCla === 'ALL' || l.Clase === fCla) &&
+        (fFec === 'ALL' || l.FechaDia === fFec) &&
+        (q === '' || l.Lote.toLowerCase().includes(q) || l.Piscina.toLowerCase().includes(q))
+      );
+
+      currentPage = 1;
+      renderDashboard();
+      renderRawTable();
+    }
+
+    function renderDashboard() {
+      const n = filteredLots.length;
+      const totalLbs = filteredLots.reduce((acc, r) => acc + r.Libras, 0);
+      const avgSanoPct = n > 0 ? filteredLots.reduce((acc, r) => acc + r.SanoPct, 0) / n : 0;
+      const avgSanoUnid = n > 0 ? filteredLots.reduce((acc, r) => acc + r.SanoUnid, 0) / n : 0;
+      const avgGramEntero = n > 0 ? filteredLots.reduce((acc, r) => acc + r.GramajeEntero, 0) / n : 0;
+      const avgGramCola = n > 0 ? filteredLots.reduce((acc, r) => acc + r.GramajeCola, 0) / n : 0;
+
+      const lbsClaseA = filteredLots.filter(r => r.Clase.includes('A-PRIMERA')).reduce((a, b) => a + b.Libras, 0);
+      const pctClaseA = totalLbs > 0 ? (lbsClaseA / totalLbs) * 100 : 0;
+
+      const lbsOmarsa = filteredLots.filter(r => r.Logistica.toLowerCase().includes('omarsa')).reduce((a, b) => a + b.Libras, 0);
+      const pctOmarsa = totalLbs > 0 ? (lbsOmarsa / totalLbs) * 100 : 0;
+
+      // Actualizar KPIs
+      document.getElementById('kpiLotes').textContent = n.toLocaleString('es-EC');
+      document.getElementById('kpiFilasInfo').textContent = `de ${rawRows.length.toLocaleString('es-EC')} filas en CSV`;
+      document.getElementById('kpiLibras').textContent = Math.round(totalLbs).toLocaleString('es-EC');
+      document.getElementById('kpiSanoPct').textContent = avgSanoPct.toFixed(2) + '%';
+      document.getElementById('kpiSanoUnid').textContent = `Prom. ${avgSanoUnid.toFixed(0)} unid/muestra`;
+      document.getElementById('kpiGramajeEntero').textContent = avgGramEntero.toFixed(2) + ' g';
+      document.getElementById('kpiGramajeCola').textContent = `Meta Cola: ${avgGramCola.toFixed(2)} g`;
+      document.getElementById('kpiClaseA').textContent = pctClaseA.toFixed(1) + '%';
+      document.getElementById('kpiClaseALbs').textContent = `${Math.round(lbsClaseA).toLocaleString('es-EC')} lbs A-PRIMERA`;
+      document.getElementById('kpiLogisticaOmarsa').textContent = pctOmarsa.toFixed(1) + '%';
+      document.getElementById('kpiLogisticaDetalle').textContent = `Logística Omarsa (lbs)`;
+
+      // 1. Gráfico Pie de Clases
+      const clasesMap = {};
+      filteredLots.forEach(r => { clasesMap[r.Clase] = (clasesMap[r.Clase] || 0) + r.Libras; });
+      const clasesLabels = Object.keys(clasesMap).sort();
+      if (charts.clasesPie) charts.clasesPie.destroy();
+      charts.clasesPie = new Chart(document.getElementById('chartClasesPie'), {
+        type: 'doughnut',
+        data: {
+          labels: clasesLabels,
+          datasets: [{
+            data: clasesLabels.map(c => Math.round(clasesMap[c])),
+            backgroundColor: clasesLabels.map(c => CLASE_COLORS[c] || CLASE_COLORS.OTROS)
+          }]
+        },
+        options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
+
+      // 2. Gráfico Tendencia Diaria
+      const diaMap = {};
+      filteredLots.forEach(r => {
+        if (!diaMap[r.FechaDia]) diaMap[r.FechaDia] = { lbs: 0, sumPct: 0, count: 0 };
+        diaMap[r.FechaDia].lbs += r.Libras;
+        diaMap[r.FechaDia].sumPct += r.SanoPct;
+        diaMap[r.FechaDia].count++;
+      });
+      const fechasSort = Object.keys(diaMap).sort((a, b) => parseDateObj(a) - parseDateObj(b));
+      if (charts.tendenciaDia) charts.tendenciaDia.destroy();
+      charts.tendenciaDia = new Chart(document.getElementById('chartTendenciaDia'), {
+        data: {
+          labels: fechasSort,
+          datasets: [
+            {
+              type: 'line',
+              label: '% E. Fresco y Sano',
+              data: fechasSort.map(f => (diaMap[f].sumPct / diaMap[f].count).toFixed(2)),
+              borderColor: '#10b981',
+              backgroundColor: '#10b981',
+              yAxisID: 'y1',
+              tension: 0.3
+            },
+            {
+              type: 'bar',
+              label: 'Libras Recibidas',
+              data: fechasSort.map(f => Math.round(diaMap[f].lbs)),
+              backgroundColor: 'rgba(37, 99, 235, 0.75)',
+              yAxisID: 'y'
+            }
+          ]
+        },
+        options: {
+          maintainAspectRatio: false,
+          scales: {
+            y: { position: 'left', title: { display: true, text: 'Libras (lb)' } },
+            y1: { position: 'right', min: 0, max: 100, grid: { drawOnChartArea: false }, title: { display: true, text: '% Fresco y Sano' } }
+          }
+        }
+      });
+
+      // 3. Camaroneras Stack por Clase (Top 15 por volumen)
+      const camMap = {};
+      filteredLots.forEach(r => {
+        if (!camMap[r.Camaronera]) camMap[r.Camaronera] = { total: 0, 'A-PRIMERA': 0, 'B-SEGUNDA': 0, 'C-TERCERO': 0 };
+        camMap[r.Camaronera].total += r.Libras;
+        if (camMap[r.Camaronera][r.Clase] !== undefined) camMap[r.Camaronera][r.Clase] += r.Libras;
+      });
+      const topCams = Object.entries(camMap).sort((a, b) => b[1].total - a[1].total).slice(0, 15).map(e => e[0]);
+      const mainClases = ['A-PRIMERA', 'B-SEGUNDA', 'C-TERCERO'];
+      if (charts.camStack) charts.camStack.destroy();
+      charts.camStack = new Chart(document.getElementById('chartCamaroneraStack'), {
+        type: 'bar',
+        data: {
+          labels: topCams,
+          datasets: mainClases.map(cl => ({
+            label: cl,
+            backgroundColor: CLASE_COLORS[cl],
+            data: topCams.map(cam => Math.round(camMap[cam][cl] || 0))
+          }))
+        },
+        options: {
+          maintainAspectRatio: false,
+          scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'Libras Recibidas' } } }
+        }
+      });
+
+      // 4. Tab 2: Desempeño Logístico
+      const logMap = {};
+      filteredLots.forEach(r => {
+        if (!logMap[r.Logistica]) logMap[r.Logistica] = { lotes: 0, lbs: 0, sumSano: 0, 'A-PRIMERA': 0, 'B-SEGUNDA': 0, 'C-TERCERO': 0 };
+        const lg = logMap[r.Logistica];
+        lg.lotes++;
+        lg.lbs += r.Libras;
+        lg.sumSano += r.SanoPct;
+        if (lg[r.Clase] !== undefined) lg[r.Clase] += r.Libras;
+      });
+      const logKeys = Object.keys(logMap);
+
+      if (charts.logCalidad) charts.logCalidad.destroy();
+      charts.logCalidad = new Chart(document.getElementById('chartLogisticaCalidad'), {
+        type: 'bar',
+        data: {
+          labels: logKeys,
+          datasets: [{
+            label: '% Promedio Fresco y Sano',
+            data: logKeys.map(k => (logMap[k].sumSano / logMap[k].lotes).toFixed(2)),
+            backgroundColor: ['#2563eb', '#0d9488', '#64748b']
+          }]
+        },
+        options: { maintainAspectRatio: false, scales: { y: { min: 0, max: 100 } } }
+      });
+
+      if (charts.logClases) charts.logClases.destroy();
+      charts.logClases = new Chart(document.getElementById('chartLogisticaClases'), {
+        type: 'bar',
+        data: {
+          labels: logKeys,
+          datasets: mainClases.map(cl => ({
+            label: cl,
+            backgroundColor: CLASE_COLORS[cl],
+            data: logKeys.map(k => logMap[k].lbs > 0 ? ((logMap[k][cl] / logMap[k].lbs) * 100).toFixed(1) : 0)
+          }))
+        },
+        options: { maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, max: 100 } } }
+      });
+
+      const tbLog = document.getElementById('tbodyLogistica');
+      tbLog.innerHTML = logKeys.map(k => {
+        const d = logMap[k];
+        const avgS = (d.sumSano / d.lotes).toFixed(2);
+        const pA = d.lbs > 0 ? ((d['A-PRIMERA'] / d.lbs) * 100).toFixed(1) : '0.0';
+        const pB = d.lbs > 0 ? ((d['B-SEGUNDA'] / d.lbs) * 100).toFixed(1) : '0.0';
+        const pC = d.lbs > 0 ? ((d['C-TERCERO'] / d.lbs) * 100).toFixed(1) : '0.0';
+        return `<tr class="hover:bg-slate-50">
+          <td class="p-2.5 font-bold">${k}</td>
+          <td class="p-2.5 text-right">${d.lotes.toLocaleString('es-EC')}</td>
+          <td class="p-2.5 text-right font-semibold">${Math.round(d.lbs).toLocaleString('es-EC')}</td>
+          <td class="p-2.5 text-right font-bold text-emerald-700">${avgS}%</td>
+          <td class="p-2.5 text-right text-green-700 font-semibold">${pA}%</td>
+          <td class="p-2.5 text-right text-amber-700 font-semibold">${pB}%</td>
+          <td class="p-2.5 text-right text-red-700 font-semibold">${pC}%</td>
+        </tr>`;
+      }).join('');
+
+      // 5. Tab 3: Scorecard por Camaronera + Piscina
+      const piscMap = {};
+      filteredLots.forEach(r => {
+        const key = `${r.Camaronera}||${r.Piscina}`;
+        if (!piscMap[key]) piscMap[key] = { cam: r.Camaronera, pisc: r.Piscina, lotes: 0, lbs: 0, sumSano: 0 };
+        piscMap[key].lotes++;
+        piscMap[key].lbs += r.Libras;
+        piscMap[key].sumSano += r.SanoPct;
+      });
+      const piscArr = Object.values(piscMap).map(p => ({ ...p, avgSano: p.sumSano / p.lotes }));
+      const mejores = [...piscArr].sort((a, b) => b.avgSano - a.avgSano).slice(0, 10);
+      const peores = [...piscArr].sort((a, b) => a.avgSano - b.avgSano).slice(0, 10);
+
+      document.getElementById('tbodyMejores').innerHTML = mejores.map(p => `
+        <tr>
+          <td class="p-2 font-bold">${p.cam}</td>
+          <td class="p-2">${p.pisc}</td>
+          <td class="p-2 text-right">${p.lotes}</td>
+          <td class="p-2 text-right">${Math.round(p.lbs).toLocaleString('es-EC')}</td>
+          <td class="p-2 text-right font-bold text-green-700">${p.avgSano.toFixed(2)}%</td>
+        </tr>`).join('');
+
+      document.getElementById('tbodyPeores').innerHTML = peores.map(p => `
+        <tr>
+          <td class="p-2 font-bold">${p.cam}</td>
+          <td class="p-2">${p.pisc}</td>
+          <td class="p-2 text-right">${p.lotes}</td>
+          <td class="p-2 text-right">${Math.round(p.lbs).toLocaleString('es-EC')}</td>
+          <td class="p-2 text-right font-bold text-red-700">${p.avgSano.toFixed(2)}%</td>
+        </tr>`).join('');
+
+      // 6. Tab 4: Correlaciones con muestreo inteligente para +13k filas
+      const MAX_SCATTER = 1500;
+      let sampleLots = filteredLots;
+      if (filteredLots.length > MAX_SCATTER) {
+        const step = Math.ceil(filteredLots.length / MAX_SCATTER);
+        sampleLots = filteredLots.filter((_, idx) => idx % step === 0);
+      }
+      document.getElementById('scatterSampleInfo').textContent = `Mostrando ${sampleLots.length.toLocaleString()} de ${filteredLots.length.toLocaleString()} lotes`;
+
+      if (charts.corrGram) charts.corrGram.destroy();
+      charts.corrGram = new Chart(document.getElementById('chartCorrGramaje'), {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            label: 'Entero vs Cola (g)',
+            data: sampleLots.map(r => ({ x: r.GramajeEntero, y: r.GramajeCola, lote: r.Lote, pisc: r.Piscina })),
+            backgroundColor: 'rgba(37, 99, 235, 0.6)'
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: {
+            tooltip: {
+              callbacks: { label: ctx => `Lote ${ctx.raw.lote} (${ctx.raw.pisc}): Entero ${ctx.raw.x}g | Cola ${ctx.raw.y}g` }
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: 'Meta Gramaje Entero (g)' } },
+            y: { title: { display: true, text: 'Meta Gramaje Cola (g)' } }
+          }
+        }
+      });
+
+      if (charts.corrCalidad) charts.corrCalidad.destroy();
+      charts.corrCalidad = new Chart(document.getElementById('chartCorrCalidadGramaje'), {
+        type: 'scatter',
+        data: {
+          datasets: mainClases.map(cl => ({
+            label: cl,
+            backgroundColor: CLASE_COLORS[cl],
+            data: sampleLots.filter(r => r.Clase === cl).map(r => ({ x: r.GramajeEntero, y: r.SanoPct, lote: r.Lote }))
+          }))
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: {
+            tooltip: {
+              callbacks: { label: ctx => `Lote ${ctx.raw.lote}: Gramaje ${ctx.raw.x}g | Sano ${ctx.raw.y}%` }
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: 'Meta Gramaje Entero (g)' } },
+            y: { title: { display: true, text: '% E. Fresco y Sano' }, min: 0, max: 100 }
+          }
+        }
+      });
+    }
+
+    // Paginación rápida para explorar los +13,000 registros sin trabar el DOM
+    function renderRawTable() {
+      const totalPages = Math.max(1, Math.ceil(filteredLots.length / ROWS_PER_PAGE));
+      if (currentPage > totalPages) currentPage = totalPages;
+      const start = (currentPage - 1) * ROWS_PER_PAGE;
+      const pageItems = filteredLots.slice(start, start + ROWS_PER_PAGE);
+
+      document.getElementById('tableCountInfo').textContent = `Mostrando ${start + 1} - ${Math.min(start + ROWS_PER_PAGE, filteredLots.length)} de ${filteredLots.length.toLocaleString('es-EC')} registros`;
+      document.getElementById('pageIndicator').textContent = `Página ${currentPage} de ${totalPages}`;
+
+      const badgeClass = cl => {
+        if (cl.includes('A-PRIMERA')) return 'badge-a';
+        if (cl.includes('B-SEGUNDA')) return 'badge-b';
+        return 'badge-c';
+      };
+
+      document.getElementById('tbodyRawData').innerHTML = pageItems.map(r => `
+        <tr class="hover:bg-slate-100">
+          <td class="p-2 font-bold text-slate-900">${r.Lote}</td>
+          <td class="p-2">${r.Camaronera}</td>
+          <td class="p-2 font-mono">${r.Piscina}</td>
+          <td class="p-2">${r.Logistica}</td>
+          <td class="p-2 text-slate-500">${r.FechaFull}</td>
+          <td class="p-2 text-right">${r.GramajeEntero.toFixed(2)}</td>
+          <td class="p-2 text-right">${r.GramajeCola.toFixed(2)}</td>
+          <td class="p-2 text-right font-semibold">${r.SanoUnid} (${r.SanoPct.toFixed(2)}%)</td>
+          <td class="p-2 text-right font-bold">${r.Libras.toLocaleString('es-EC', { minimumFractionDigits: 2 })}</td>
+          <td class="p-2 text-center"><span class="${badgeClass(r.Clase)} text-[10px] px-2 py-0.5 rounded font-bold">${r.Clase}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    function changePage(delta) {
+      const totalPages = Math.max(1, Math.ceil(filteredLots.length / ROWS_PER_PAGE));
+      const next = currentPage + delta;
+      if (next >= 1 && next <= totalPages) {
+        currentPage = next;
+        renderRawTable();
+      }
+    }
+
+    function exportCSV() {
+      if (!filteredLots.length) return;
+      const headers = ['Lote', 'Nombre de camaronera', 'Piscina', 'Tipo de logística de pesca', 'Fecha de llegada', 'Meta_Gramaje entero', 'Meta_Gramaje cola', 'Unidades Fresco y Sano', 'Porcentaje Fresco y Sano', 'Libras recibidas total', 'Clase a empacar'];
+      const rows = filteredLots.map(r => [
+        `"${r.Lote}"`, `"${r.Camaronera}"`, `"${r.Piscina}"`, `"${r.Logistica}"`, `"${r.FechaFull}"`,
+        r.GramajeEntero, r.GramajeCola, r.SanoUnid, r.SanoPct, r.Libras, `"${r.Clase}"`
+      ].join(','));
+
+      const blob = new Blob(["\uFEFF" + headers.join(',') + '\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'Recepcion_Camaron_Filtrado.csv';
+      a.click();
+    }
+
+    function resetFilters() {
+      ['fCamaronera', 'fLogistica', 'fClase', 'fFecha'].forEach(id => document.getElementById(id).value = 'ALL');
+      document.getElementById('fBusqueda').value = '';
+      applyFilters();
+    }
+
+    function switchTab(id) {
+      ['tab1', 'tab2', 'tab3', 'tab4', 'tab5'].forEach(t => {
+        document.getElementById(t).classList.add('hidden');
+        document.getElementById('btn-' + t).classList.remove('tab-active');
+      });
+      document.getElementById(id).classList.remove('hidden');
+      document.getElementById('btn-' + id).classList.add('tab-active');
+    }
+  </script>
 </body>
 </html>
